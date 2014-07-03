@@ -34,48 +34,48 @@ class TrackerBDD {
         list($info_hash, $peer_id, $ip, $port, $downloaded, $uploaded, $left, $status, $ttl) = $this->prepare(array($info_hash, $peer_id, $ip, $port, $downloaded, $uploaded, $left, $status, $ttl));
         
         //Check if the client already announced for this torrent
-        $requete = $this->_bdd->prepare('SELECT id FROM tracker_peers WHERE info_hash = :info_hash AND peer_id = :peer_id');
-        $requete->bindValue(':info_hash', $info_hash);
-        $requete->bindValue(':peer_id', $peer_id);
-        $requete->execute();
-        $resultat = $requete->rowCount();
-        $requete->closeCursor();
+        $query = $this->_bdd->prepare('SELECT id FROM tracker_peers WHERE info_hash = :info_hash AND peer_id = :peer_id');
+        $query->bindValue(':info_hash', $info_hash);
+        $query->bindValue(':peer_id', $peer_id);
+        $query->execute();
+        $result = $query->rowCount();
+        $query->closeCursor();
         
         //If not we insert
-        if($resultat <= 0){
-            $requete = $this->_bdd->prepare('INSERT INTO tracker_peers(info_hash, peer_id, ip_address, port, bytes_downloaded, bytes_uploaded, bytes_left, status,
+        if($result <= 0){
+            $query = $this->_bdd->prepare('INSERT INTO tracker_peers(info_hash, peer_id, ip_address, port, bytes_downloaded, bytes_uploaded, bytes_left, status,
                                                                        expires) 
                                                     VALUES(:info_hash, :peer_id, INET_ATON(:ip), :port, :downloaded, :uploaded, :left, :status, 
                                                                        DATE_ADD(NOW(), INTERVAL :interval SECOND))');
-            $requete->bindValue(':info_hash', $info_hash);
-            $requete->bindValue(':peer_id', $peer_id);
-            $requete->bindValue(':ip', $ip);
-            $requete->bindValue(':port', $port);
-            $requete->bindValue(':downloaded', $uploaded);
-            $requete->bindValue(':uploaded', $downloaded);
-            $requete->bindValue(':left', $left);
-            $requete->bindValue(':status', $status);
-            $requete->bindValue(':interval', $ttl);
-            $requete->execute();
-            $requete->closeCursor();
+            $query->bindValue(':info_hash', $info_hash);
+            $query->bindValue(':peer_id', $peer_id);
+            $query->bindValue(':ip', $ip);
+            $query->bindValue(':port', $port);
+            $query->bindValue(':downloaded', $uploaded);
+            $query->bindValue(':uploaded', $downloaded);
+            $query->bindValue(':left', $left);
+            $query->bindValue(':status', $status);
+            $query->bindValue(':interval', $ttl);
+            $query->execute();
+            $query->closeCursor();
         }
         //Else we update current informations
-        else if($resultat == 1){
-            $requete = $this->_bdd->prepare('UPDATE tracker_peers SET ip_address = INET_ATON(:ip), port = :port, bytes_downloaded = :downloaded, 
+        else if($result == 1){
+            $query = $this->_bdd->prepare('UPDATE tracker_peers SET ip_address = INET_ATON(:ip), port = :port, bytes_downloaded = :downloaded, 
                                              bytes_uploaded = :uploaded, bytes_left = :left, status = :status, 
                                              expires = DATE_ADD(NOW(), INTERVAL :interval SECOND) 
                                              WHERE info_hash = :info_hash AND peer_id = :peer_id');
-            $requete->bindValue(':info_hash', $info_hash);
-            $requete->bindValue(':peer_id', $peer_id);
-            $requete->bindValue(':ip', $ip);
-            $requete->bindValue(':port', $port);
-            $requete->bindValue(':downloaded', $uploaded);
-            $requete->bindValue(':uploaded', $downloaded);
-            $requete->bindValue(':left', $left);
-            $requete->bindValue(':status', $status);
-            $requete->bindValue(':interval', $ttl);
-            $requete->execute();
-            $requete->closeCursor();
+            $query->bindValue(':info_hash', $info_hash);
+            $query->bindValue(':peer_id', $peer_id);
+            $query->bindValue(':ip', $ip);
+            $query->bindValue(':port', $port);
+            $query->bindValue(':downloaded', $uploaded);
+            $query->bindValue(':uploaded', $downloaded);
+            $query->bindValue(':left', $left);
+            $query->bindValue(':status', $status);
+            $query->bindValue(':interval', $ttl);
+            $query->execute();
+            $query->closeCursor();
         }
         return true;
     }
@@ -93,24 +93,24 @@ class TrackerBDD {
     //  )
     // )
     public function getPeers($info_hash, $peer_id, $compact = false, $no_peer_id = false){
-        $requete = $this->_bdd->prepare('SELECT peer_id, INET_NTOA(ip_address) AS ip_address, port FROM tracker_peers 
+        $query = $this->_bdd->prepare('SELECT peer_id, INET_NTOA(ip_address) AS ip_address, port FROM tracker_peers 
                                          WHERE info_hash = :info_hash AND peer_id != :peer_id AND (expires IS NULL OR expires > NOW())');
         
         list($info_hash, $peer_id) = $this->prepare(array($info_hash, $peer_id));
-        $requete->bindValue(':info_hash', $info_hash);
-        $requete->bindValue(':peer_id', $peer_id);
-        $requete->execute();
+        $query->bindValue(':info_hash', $info_hash);
+        $query->bindValue(':peer_id', $peer_id);
+        $query->execute();
         
         if($compact){
             $return = '';
-            while($row = $requete->fetch()){
+            while($row = $query->fetch()){
                 $return .= pack('N', ip2long($row['ip_address']));
                 $return .= pack('n', intval($row['port']));
             }
         }
         else{
             $return = array();
-            while($row = $requete->fetch()){
+            while($row = $query->fetch()){
                 $peer = array(
                     'ip' => $row['ip_address'],
                     'port' => $row['port'],
@@ -122,22 +122,22 @@ class TrackerBDD {
             }
         }
         
-        $requete->closeCursor();
+        $query->closeCursor();
         return $return;
     }
 
     //Return leech/seed stats of a torrent
     public function getPeerStats($info_hash, $peer_id){
-        $requete = $this->_bdd->prepare('SELECT COALESCE(SUM(status = "complete"), 0) AS complete,
+        $query = $this->_bdd->prepare('SELECT COALESCE(SUM(status = "complete"), 0) AS complete,
                                                 COALESCE(SUM(status != "complete"), 0) AS incomplete
                                          FROM tracker_peers 
                                          WHERE info_hash = :info_hash AND peer_id != :peer_id AND (expires IS NULL OR expires > NOW())');
         list($info_hash, $peer_id) = $this->prepare(array($info_hash, $peer_id));
-        $requete->bindValue(':info_hash', $info_hash);
-        $requete->bindValue(':peer_id', $peer_id);
-        $requete->execute();
-        $results = $requete->fetch();
-        $requete->closeCursor();
+        $query->bindValue(':info_hash', $info_hash);
+        $query->bindValue(':peer_id', $peer_id);
+        $query->execute();
+        $results = $query->fetch();
+        $query->closeCursor();
 
         return $results;
     }
